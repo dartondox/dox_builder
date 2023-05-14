@@ -9,7 +9,7 @@ builders:
     target: ":dox_builder"
     import: "package:dox_builder/dox_builder.dart"
     builder_factories: ["buildDoxModel"]
-    build_extensions: { ".dart": [".gm.dart"] }
+    build_extensions: { ".dart": [".g.dart"] }
     auto_apply: dependents
     build_to: cache
     applies_builders: ["source_gen|combining_builder"]
