@@ -39,6 +39,13 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
 
       ${_primaryKeySetterAndGetter(primaryKey)}
 
+      $className get newQuery => $className();
+
+      @override
+      List get preloadList => [
+        ${r['eagerLoad']}
+      ];
+
       @override
       Map<String, Function> get relationsResultMatcher => {
           ${r['mapResultContent']}
@@ -70,44 +77,56 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
     String content = '';
     String mapResultContent = '';
     String mapQueryContent = '';
+    String eagerLoad = '';
     visitor.relations.forEach((key, value) {
       String getFunctionName = 'get${ucFirst(key.toString())}';
       String queryFunctionName = 'query${ucFirst(key.toString())}';
 
-      String foreignKey = value['foreignKey'] != null
-          ? ", foreignKey: '${value['foreignKey']}'"
-          : '';
-
-      String localKey =
-          value['localKey'] != null ? ", localKey: '${value['localKey']}'" : '';
-
-      String ownerKey =
-          value['ownerKey'] != null ? ", ownerKey: '${value['ownerKey']}'" : '';
-
-      String whereQuery = value['whereQuery'] != null
-          ? ".whereRaw('${value['whereQuery']}')"
+      String onQuery = value['onQuery'] != null
+          ? ", onQuery: ${visitor.className}.${value['onQuery']}"
           : '';
 
       mapResultContent += "'$key': $getFunctionName,";
       mapQueryContent += "'$key': $queryFunctionName,";
 
+      eagerLoad += value['eager'] == true ? "'$key'," : "";
+
       content += """
-      static Future $getFunctionName(${visitor.className} i) async {
-        var q = i.${value['relationType']}(i, () => ${value['model']}() $foreignKey $localKey $ownerKey,)$whereQuery;
-        i.$key = isEmpty(i.$key) ? await q.end : i.$key;
-        return i.$key;
+      static Future $getFunctionName(List list) async {
+        var result = await get${value['relationType']}<${value['model']}>($queryFunctionName(list), list);
+        for (${visitor.className} i in list) {
+          i.$key = result[i.tempIdValue.toString()];
+          if (list.length == 1) {
+            return i.$key;
+          }
+        }
       }
 
-      static ${value['model']} $queryFunctionName(${visitor.className} i) {
-        return i.${value['relationType']}(i, () => ${value['model']}() $foreignKey $localKey,)$whereQuery;
+      static ${value['model']}? $queryFunctionName(List list) {
+        return ${lcFirst(value['relationType'])}<${value['model']}>(list, 
+          () => ${value['model']}() 
+          ${_getParamKeyValue(value, 'foreignKey')}
+          ${_getParamKeyValue(value, 'localKey')}
+          ${_getParamKeyValue(value, 'relatedKey')}
+          ${_getParamKeyValue(value, 'pivotForeignKey')}
+          ${_getParamKeyValue(value, 'pivotRelatedForeignKey')}
+          ${_getParamKeyValue(value, 'pivotTable')}
+          $onQuery,
+        );
       }
       """;
     });
+
     return {
       'mapResultContent': mapResultContent,
       'mapQueryContent': mapQueryContent,
       'content': content,
+      'eagerLoad': eagerLoad,
     };
+  }
+
+  _getParamKeyValue(value, key) {
+    return value[key] != null ? ", $key: '${value[key]}'" : '';
   }
 
   _getTableNameSetter(tableName) {
@@ -181,5 +200,12 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
 
   ucFirst(String str) {
     return str.substring(0, 1).toUpperCase() + str.substring(1);
+  }
+
+  lcFirst(String? str) {
+    if (str == null) {
+      return '';
+    }
+    return str.substring(0, 1).toLowerCase() + str.substring(1);
   }
 }

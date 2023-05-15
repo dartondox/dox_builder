@@ -21,8 +21,8 @@ class ModelVisitor extends SimpleElementVisitor<void> {
         .isNotEmpty;
 
     var isRelation = element.metadata
-        .where((m) =>
-            ['HasOne', 'HasMany', 'BelongsTo'].contains(m.element?.displayName))
+        .where((m) => ['HasOne', 'HasMany', 'BelongsTo', 'ManyToMany']
+            .contains(m.element?.displayName))
         .isNotEmpty;
 
     String elementKey = element.name;
@@ -30,7 +30,7 @@ class ModelVisitor extends SimpleElementVisitor<void> {
     if (isRelation == true) {
       ElementAnnotation metaData = element.metadata.first;
       DartObject? object = metaData.computeConstantValue();
-      var whereQuery = object?.getField('whereQuery')?.toStringValue();
+      var onQuery = object?.getField('onQuery')?.toFunctionValue()?.displayName;
 
       String? model = object
           ?.getField('model')
@@ -39,16 +39,27 @@ class ModelVisitor extends SimpleElementVisitor<void> {
           .replaceFirst('*', '');
 
       String? foreignKey = object?.getField('foreignKey')?.toStringValue();
-
       String? localKey = object?.getField('localKey')?.toStringValue();
+      String? relatedKey = object?.getField('relatedKey')?.toStringValue();
+      String? pivotForeignKey =
+          object?.getField('pivotForeignKey')?.toStringValue();
+      String? pivotRelatedForeignKey =
+          object?.getField('pivotRelatedForeignKey')?.toStringValue();
+      String? pivotTable = object?.getField('pivotTable')?.toStringValue();
+      bool eager = object?.getField('eager')?.toBoolValue() ?? false;
 
       relations[element.name] = {
-        'relationType': lcFirst(metaData.element?.displayName),
+        'relationType': metaData.element?.displayName,
         'model': model?.replaceFirst('?', ''),
         'dataType': element.type.toString().replaceFirst('*', ''),
         'localKey': localKey,
         'foreignKey': foreignKey,
-        'whereQuery': whereQuery
+        'onQuery': onQuery,
+        'eager': eager,
+        'relatedKey': relatedKey,
+        'pivotForeignKey': pivotForeignKey,
+        'pivotRelatedForeignKey': pivotRelatedForeignKey,
+        'pivotTable': pivotTable
       };
     }
 
@@ -70,12 +81,5 @@ class ModelVisitor extends SimpleElementVisitor<void> {
         'beforeGet': beforeGet,
       };
     }
-  }
-
-  lcFirst(String? str) {
-    if (str == null) {
-      return '';
-    }
-    return str.substring(0, 1).toLowerCase() + str.substring(1);
   }
 }
