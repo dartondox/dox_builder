@@ -17,23 +17,62 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
         annotation.objectValue.getField('table')?.toStringValue();
     String primaryKey =
         annotation.objectValue.getField('primaryKey')?.toStringValue() ?? 'id';
+    String? createdAt =
+        annotation.objectValue.getField('createdAt')?.toStringValue();
+    String? updatedAt =
+        annotation.objectValue.getField('updatedAt')?.toStringValue();
 
     final visitor = ModelVisitor();
-    visitor.columns[primaryKey] = {
-      'type': 'int?',
-      'jsonKey': primaryKey,
-      'beforeSave': null,
-      'beforeGet': null,
-    };
+
+    /// @tod primaryKey must to parse to camelCase
+    visitor.columns.addAll({
+      primaryKey: {
+        'type': 'int?',
+        'jsonKey': primaryKey,
+        'beforeSave': null,
+        'beforeGet': null,
+      }
+    });
+
     element.visitChildren(visitor);
+
+    if (createdAt != null) {
+      visitor.columns.addAll({
+        'createdAt': {
+          'type': 'DateTime?',
+          'jsonKey': createdAt,
+          'beforeSave': null,
+          'beforeGet': null,
+        }
+      });
+    }
+    if (updatedAt != null) {
+      visitor.columns.addAll({
+        'updatedAt': {
+          'type': 'DateTime?',
+          'jsonKey': updatedAt,
+          'beforeSave': null,
+          'beforeGet': null,
+        }
+      });
+    }
     String className = visitor.className;
 
     var r = _getRelationsCode(visitor);
+
+    String createdColumn = createdAt != null ? "'$createdAt'" : 'null';
+    String updatedColumn = updatedAt != null ? "'$updatedAt'" : 'null';
 
     return """
     class ${className}Generator extends Model<$className> {
       @override
       String get primaryKey => '$primaryKey';
+
+      @override
+      Map<String, dynamic> get timestampsColumn => {
+        'created_at': $createdColumn,
+        'updated_at': $updatedColumn,
+      };
 
       ${_getTableNameSetter(tableName)}
 
