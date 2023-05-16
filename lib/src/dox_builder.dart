@@ -4,6 +4,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:build/src/builder/build_step.dart';
 import 'package:dox_annotation/dox_annotation.dart';
 import 'package:dox_builder/src/model_visitor.dart';
+import 'package:dox_builder/src/util.dart';
 import 'package:source_gen/source_gen.dart';
 
 class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
@@ -15,8 +16,9 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
   ) {
     String? tableName =
         annotation.objectValue.getField('table')?.toStringValue();
-    String primaryKey =
+    String primaryKeySnakeCase =
         annotation.objectValue.getField('primaryKey')?.toStringValue() ?? 'id';
+    String primaryKey = toCamelCase(primaryKeySnakeCase);
     String? createdAt =
         annotation.objectValue.getField('createdAt')?.toStringValue();
     String? updatedAt =
@@ -24,11 +26,10 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
 
     final visitor = ModelVisitor();
 
-    /// @tod primaryKey must to parse to camelCase
     visitor.columns.addAll({
       primaryKey: {
         'type': 'int?',
-        'jsonKey': primaryKey,
+        'jsonKey': primaryKeySnakeCase,
         'beforeSave': null,
         'beforeGet': null,
       }
@@ -57,16 +58,15 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
       });
     }
     String className = visitor.className;
-
-    var r = _getRelationsCode(visitor);
-
     String createdColumn = createdAt != null ? "'$createdAt'" : 'null';
     String updatedColumn = updatedAt != null ? "'$updatedAt'" : 'null';
+
+    var r = _getRelationsCode(visitor);
 
     return """
     class ${className}Generator extends Model<$className> {
       @override
-      String get primaryKey => '$primaryKey';
+      String get primaryKey => '$primaryKeySnakeCase';
 
       @override
       Map<String, dynamic> get timestampsColumn => {
@@ -235,16 +235,5 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
       content += "'$jsonKey' : $setValue,\n";
     });
     return content;
-  }
-
-  ucFirst(String str) {
-    return str.substring(0, 1).toUpperCase() + str.substring(1);
-  }
-
-  lcFirst(String? str) {
-    if (str == null) {
-      return '';
-    }
-    return str.substring(0, 1).toLowerCase() + str.substring(1);
   }
 }
