@@ -62,6 +62,7 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
     String updatedColumn = updatedAt != null ? "'$updatedAt'" : 'null';
 
     var r = _getRelationsCode(visitor);
+    var map = _getCodeForToMap(visitor);
 
     return """
     class ${className}Generator extends Model<$className> {
@@ -104,9 +105,11 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
       @override
       Map<String, dynamic> convertToMap(i) {
         $className instance = i as $className;
-        return {
-          ${_getCodeForToMap(visitor)}
+        Map<String, dynamic> map = {
+          ${map['jsonMapper']}
         };
+        ${map['parseContent']}
+        return map;
       }
     }
     """;
@@ -200,12 +203,12 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
               : DateTime.parse(m['$jsonKey'] as String)
           """;
         if (beforeGet != null) {
-          setValue = "$className.$beforeGet($setValue)";
+          setValue = "$className.$beforeGet(m)";
         }
       } else {
         setValue = "m['$jsonKey'] as ${values['type']}";
         if (beforeGet != null) {
-          setValue = "$className.$beforeGet($setValue)";
+          setValue = "$className.$beforeGet(m)";
         }
       }
       content += "..$filedName = $setValue\n";
@@ -214,7 +217,8 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
   }
 
   _getCodeForToMap(ModelVisitor visitor) {
-    String content = '';
+    String jsonMapper = '';
+    String parseContent = '';
     String className = visitor.className;
     visitor.columns.forEach((filedName, values) {
       String? beforeSave = values['beforeSave'];
@@ -223,17 +227,19 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
 
       if (values['type'] == 'DateTime?') {
         setValue = "instance.$filedName?.toIso8601String()";
-        if (beforeSave != null) {
-          setValue = "$className.$beforeSave($setValue)";
-        }
       } else {
         setValue = "instance.$filedName";
-        if (beforeSave != null) {
-          setValue = "$className.$beforeSave($setValue)";
-        }
       }
-      content += "'$jsonKey' : $setValue,\n";
+
+      if (beforeSave != null) {
+        parseContent = "map['$jsonKey'] = $className.$beforeSave(map);";
+      }
+      jsonMapper += "'$jsonKey' : $setValue,\n";
     });
-    return content;
+
+    return {
+      'jsonMapper': jsonMapper,
+      'parseContent': parseContent,
+    };
   }
 }
