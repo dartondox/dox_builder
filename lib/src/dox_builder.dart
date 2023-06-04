@@ -23,6 +23,8 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
         annotation.objectValue.getField('createdAt')?.toStringValue();
     String? updatedAt =
         annotation.objectValue.getField('updatedAt')?.toStringValue();
+    bool softDelete =
+        annotation.objectValue.getField('softDelete')?.toBoolValue() ?? false;
 
     final visitor = ModelVisitor();
 
@@ -64,13 +66,17 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
     var r = _getRelationsCode(visitor);
     var map = _getCodeForToMap(visitor);
 
+    String softDeleteString = softDelete ? 'with SoftDeletes<Blog>' : '';
+
     return """
-    class ${className}Generator extends Model<$className> {
+    // ignore_for_file: always_specify_types
+
+    class ${className}Generator extends Model<$className> $softDeleteString {
       @override
       String get primaryKey => '$primaryKeySnakeCase';
 
       @override
-      Map<String, dynamic> get timestampsColumn => {
+      Map<String, dynamic> get timestampsColumn => <String, dynamic>{
         'created_at': $createdColumn,
         'updated_at': $updatedColumn,
       };
@@ -82,17 +88,17 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
       $className get newQuery => $className();
 
       @override
-      List get preloadList => [
+      List<String> get preloadList => <String>[
         ${r['eagerLoad']}
       ];
 
       @override
-      Map<String, Function> get relationsResultMatcher => {
+      Map<String, Function> get relationsResultMatcher => <String, Function>{
           ${r['mapResultContent']}
       };
 
       @override
-      Map<String, Function> get relationsQueryMatcher => {
+      Map<String, Function> get relationsQueryMatcher => <String, Function>{
           ${r['mapQueryContent']}
       };
 
@@ -103,9 +109,9 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
         ${_getCodeForFromMap(visitor)}
 
       @override
-      Map<String, dynamic> convertToMap(i) {
+      Map<String, dynamic> convertToMap(dynamic i) {
         $className instance = i as $className;
-        Map<String, dynamic> map = {
+        Map<String, dynamic> map = <String, dynamic>{
           ${map['jsonMapper']}
         };
         ${map['parseContent']}
@@ -134,18 +140,17 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
       eagerLoad += value['eager'] == true ? "'$key'," : "";
 
       content += """
-      static Future $getFunctionName(List list) async {
-        var result = await get${value['relationType']}<${value['model']}>($queryFunctionName(list), list);
-        for (${visitor.className} i in list) {
-          i.$key = result[i.tempIdValue.toString()];
-          if (list.length == 1) {
-            return i.$key;
+      static Future<void> $getFunctionName(List<Model<${visitor.className}>> list) async {
+        var result = await get${value['relationType']}<${visitor.className}, ${value['model']}>($queryFunctionName(list), list);
+        for (dynamic i in list) {
+          if (result[i.tempIdValue.toString()] != null) {
+            i.$key = result[i.tempIdValue.toString()]!;
           }
         }
       }
 
-      static ${value['model']}? $queryFunctionName(List list) {
-        return ${lcFirst(value['relationType'])}<${value['model']}>(list, 
+      static ${value['model']}? $queryFunctionName(List<Model<${visitor.className}>> list) {
+        return ${lcFirst(value['relationType'])}<${visitor.className}, ${value['model']}>(list, 
           () => ${value['model']}() 
           ${_getParamKeyValue(value, 'foreignKey')}
           ${_getParamKeyValue(value, 'localKey')}
@@ -184,7 +189,7 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
     return """
       int? get $primaryKey => tempIdValue;
       
-      set $primaryKey(val) => tempIdValue = val;
+      set $primaryKey(dynamic val) => tempIdValue = val;
     """;
   }
 
