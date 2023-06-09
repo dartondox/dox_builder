@@ -66,7 +66,7 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
     var r = _getRelationsCode(visitor);
     var map = _getCodeForToMap(visitor);
 
-    String softDeleteString = softDelete ? 'with SoftDeletes<Blog>' : '';
+    String softDeleteString = softDelete ? 'with SoftDeletes<$className>' : '';
 
     return """
     // ignore_for_file: always_specify_types
@@ -180,7 +180,7 @@ class DoxModelBuilder extends GeneratorForAnnotation<DoxModel> {
     return tableName != null
         ? """
       @override
-      String get tableName => 'blog';
+      String get tableName => '$tableName';
     """
         : '';
   }
